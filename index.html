@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catat Siswa Terlambat</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+            width: 100%;
+            max-width: 400px;
+        }
+        h2 { text-align: center; color: #333; margin-top: 0; margin-bottom: 25px;}
+        label { font-size: 14px; color: #555; font-weight: 600;}
+        select, input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0 20px 0;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+        }
+        select:focus, input:focus { border-color: #fda085; outline: none; }
+        button {
+            width: 100%;
+            background: linear-gradient(to right, #ff7e5f, #feb47b);
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+        button:active { opacity: 0.8; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #loadingText { text-align: center; color: #ff7e5f; font-size: 14px; margin-bottom: 15px; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Pencatatan Keterlambatan</h2>
+    <div id="loadingText">Sedang mengambil data siswa...</div>
+    
+    <form id="formTerlambat" style="display: none;">
+        <label for="kelas">Pilih Kelas</label>
+        <select name="kelas" id="kelas" required>
+            <option value="">-- Pilih Kelas --</option>
+        </select>
+
+        <label for="nama">Ketik / Pilih Nama Siswa</label>
+        <!-- Kolom pencarian nama dengan datalist -->
+        <input type="text" name="nama" id="inputNama" list="daftarNama" placeholder="Ketik nama siswa..." required disabled autocomplete="off">
+        <datalist id="daftarNama"></datalist>
+
+        <label for="alasan">Alasan Terlambat</label>
+        <input type="text" name="alasan" id="alasan" placeholder="Contoh: Ban bocor, Bangun kesiangan" required>
+        
+        <button type="submit" id="btnSubmit">Simpan Data</button>
+    </form>
+</div>
+
+<script>
+    // MASUKKAN URL WEB APP ANDA DI SINI
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbwTGtgUnFkmTbzoyzk1RchGty7EBKkmylyIoDSD-Cjyo-v2oGfHJ-q4YPBYJhIIQwLdFA/exec'; 
+    
+    const form = document.getElementById('formTerlambat');
+    const loadingText = document.getElementById('loadingText');
+    const selectKelas = document.getElementById('kelas');
+    const inputNama = document.getElementById('inputNama');
+    const dataListNama = document.getElementById('daftarNama');
+    const btnSubmit = document.getElementById('btnSubmit');
+
+    let dataSiswaMentah = [];
+
+    // 1. Ambil data dari Google Sheets saat web dibuka
+    fetch(scriptURL)
+        .then(response => response.json())
+        .then(data => {
+            dataSiswaMentah = data;
+            
+            // Ambil daftar kelas unik
+            const kelasUnik = [...new Set(data.map(item => item.kelas.trim()))];
+            selectKelas.innerHTML = '<option value="">-- Pilih Kelas --</option>';
+            kelasUnik.sort().forEach(kelas => {
+                let option = document.createElement('option');
+                option.value = kelas;
+                option.textContent = kelas;
+                selectKelas.appendChild(option);
+            });
+
+            loadingText.style.display = 'none';
+            form.style.display = 'block';
+        })
+        .catch(error => {
+            loadingText.textContent = 'Gagal memuat data. Periksa koneksi internet.';
+            console.error(error);
+        });
+
+    // 2. Filter opsi nama berdasarkan kelas yang dipilih
+    selectKelas.addEventListener('change', function() {
+        const kelasPilihan = this.value;
+        inputNama.value = ''; // Reset input nama
+        dataListNama.innerHTML = ''; // Reset pilihan rekomendasi
+        
+        if (kelasPilihan) {
+            inputNama.disabled = false;
+            inputNama.placeholder = "Ketik nama siswa...";
+            
+            // Filter siswa hanya dari kelas tersebut
+            const siswaDiKelas = dataSiswaMentah.filter(item => item.kelas === kelasPilihan);
+            siswaDiKelas.sort((a, b) => a.nama.localeCompare(b.nama)).forEach(siswa => {
+                let option = document.createElement('option');
+                option.value = siswa.nama;
+                dataListNama.appendChild(option);
+            });
+        } else {
+            inputNama.disabled = true;
+            inputNama.placeholder = "Pilih kelas terlebih dahulu...";
+        }
+    });
+
+    // 3. Simpan data ke Google Sheets
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+        btnSubmit.disabled = true;
+        btnSubmit.textContent = 'Menyimpan...';
+
+        fetch(scriptURL, { method: 'POST', body: new FormData(form)})
+            .then(response => {
+                alert('Data berhasil disimpan!');
+                form.reset();
+                inputNama.disabled = true;
+                inputNama.placeholder = "Pilih kelas terlebih dahulu...";
+                dataListNama.innerHTML = '';
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = 'Simpan Data';
+            })
+            .catch(error => {
+                alert('Terjadi kesalahan saat menyimpan!');
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = 'Simpan Data';
+            });
+    });
+</script>
+</body>
+</html>
