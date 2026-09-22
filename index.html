@@ -80,8 +80,8 @@
 </div>
 
 <script>
-    // MASUKKAN URL WEB APP ANDA DI SINI
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbwTGtgUnFkmTbzoyzk1RchGty7EBKkmylyIoDSD-Cjyo-v2oGfHJ-q4YPBYJhIIQwLdFA/exec'; 
+    // MASUKKAN URL WEB APP APPS SCRIPT ANDA DI SINI
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbxgbrXXwgJ2nmjxLB-a28geRMfcTXFuGSszZwKbRGrE3Pj0x1XB8NzTiW646TUSC6P_Qw/exec'; 
     
     const form = document.getElementById('formTerlambat');
     const loadingText = document.getElementById('loadingText');
@@ -91,55 +91,100 @@
     const btnSubmit = document.getElementById('btnSubmit');
 
     let dataSiswaMentah = [];
+    let namaSudahTelatHariIni = [];
 
-    // 1. Ambil data dari Google Sheets saat web dibuka
-    fetch(scriptURL)
-        .then(response => response.json())
-        .then(data => {
-            dataSiswaMentah = data;
-            
-            // Ambil daftar kelas unik
-            const kelasUnik = [...new Set(data.map(item => item.kelas.trim()))];
-            selectKelas.innerHTML = '<option value="">-- Pilih Kelas --</option>';
-            kelasUnik.sort().forEach(kelas => {
-                let option = document.createElement('option');
-                option.value = kelas;
-                option.textContent = kelas;
-                selectKelas.appendChild(option);
-            });
+    // Mengambil tanggal hari ini format lokal (YYYY-MM-DD)
+    const skrg = new Date();
+    const hariIniStr = skrg.toLocaleDateString('id-ID');
 
-            loadingText.style.display = 'none';
-            form.style.display = 'block';
-        })
-        .catch(error => {
-            loadingText.textContent = 'Gagal memuat data. Periksa koneksi internet.';
-            console.error(error);
+    // 1. Ambil data Master Siswa & Data Rekap secara bersamaan
+    Promise.all([
+        fetch(scriptURL).then(res => res.json()),
+        fetch(scriptURL + '?action=rekap').then(res => res.json())
+    ])
+    .then(([dataSiswa, dataRekap]) => {
+        dataSiswaMentah = dataSiswa;
+        
+        // Filter nama-nama siswa yang sudah dicatat pada HARI INI
+        namaSudahTelatHariIni = dataRekap
+            .filter(item => {
+                if (!item.waktu) return false;
+                const tglRekap = new Date(item.waktu).toLocaleDateString('id-ID');
+                return tglRekap === hariIniStr;
+            })
+            .map(item => item.nama.toLowerCase().trim());
+
+        // Isi pilihan kelas (A-Z)
+        const kelasUnik = [...new Set(dataSiswa.map(item => item.kelas.trim()))];
+        selectKelas.innerHTML = '<option value="">-- Pilih Kelas --</option>';
+        kelasUnik.sort().forEach(kelas => {
+            let option = document.createElement('option');
+            option.value = kelas;
+            option.textContent = kelas;
+            selectKelas.appendChild(option);
         });
 
-    // 2. Filter opsi nama berdasarkan kelas yang dipilih
-    selectKelas.addEventListener('change', function() {
-        const kelasPilihan = this.value;
-        inputNama.value = ''; // Reset input nama
-        dataListNama.innerHTML = ''; // Reset pilihan rekomendasi
-        
-        if (kelasPilihan) {
-            inputNama.disabled = false;
-            inputNama.placeholder = "Ketik nama siswa...";
-            
-            // Filter siswa hanya dari kelas tersebut
-            const siswaDiKelas = dataSiswaMentah.filter(item => item.kelas === kelasPilihan);
-            siswaDiKelas.sort((a, b) => a.nama.localeCompare(b.nama)).forEach(siswa => {
-                let option = document.createElement('option');
-                option.value = siswa.nama;
-                dataListNama.appendChild(option);
-            });
-        } else {
-            inputNama.disabled = true;
-            inputNama.placeholder = "Pilih kelas terlebih dahulu...";
-        }
+        muatDaftarNama(dataSiswaMentah);
+
+        inputNama.disabled = false;
+        loadingText.style.display = 'none';
+        form.style.display = 'block';
+    })
+    .catch(error => {
+        loadingText.textContent = 'Gagal memuat data. Periksa koneksi internet.';
+        console.error(error);
     });
 
-    // 3. Simpan data ke Google Sheets
+    function muatDaftarNama(daftarSiswa) {
+        dataListNama.innerHTML = '';
+        daftarSiswa.sort((a, b) => a.nama.localeCompare(b.nama)).forEach(siswa => {
+            let option = document.createElement('option');
+            option.value = siswa.nama;
+            dataListNama.appendChild(option);
+        });
+    }
+
+    // Filter Nama berdasarkan Kelas
+    selectKelas.addEventListener('change', function() {
+        const kelasPilihan = this.value;
+        if (kelasPilihan) {
+            const siswaFiltered = dataSiswaMentah.filter(item => item.kelas === kelasPilihan);
+            muatDaftarNama(siswaFiltered);
+        } else {
+            muatDaftarNama(dataSiswaMentah);
+        }
+        cekDuplikat();
+    });
+
+    // Otomatis isi Kelas & Cek Duplikat saat Nama diketik
+    inputNama.addEventListener('input', function() {
+        const namaKetik = this.value.trim();
+        const siswaDitemukan = dataSiswaMentah.find(item => item.nama.toLowerCase() === namaKetik.toLowerCase());
+        
+        if (siswaDitemukan) {
+            selectKelas.value = siswaDitemukan.kelas;
+        }
+        cekDuplikat();
+    });
+
+    // Fungsi Validasi 1x Input per Hari
+    function cekDuplikat() {
+        const namaKetik = inputNama.value.trim().toLowerCase();
+        
+        if (namaKetik !== '' && namaSudahTelatHariIni.includes(namaKetik)) {
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = '❌ Siswa Sudah Dicatat Hari Ini';
+            btnSubmit.style.backgroundColor = '#dc3545'; // Warna merah
+            btnSubmit.style.cursor = 'not-allowed';
+        } else {
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = 'Simpan Data';
+            btnSubmit.style.backgroundColor = ''; // Kembalikan ke warna asli
+            btnSubmit.style.cursor = 'pointer';
+        }
+    }
+
+    // Simpan Data
     form.addEventListener('submit', e => {
         e.preventDefault();
         btnSubmit.disabled = true;
@@ -148,17 +193,17 @@
         fetch(scriptURL, { method: 'POST', body: new FormData(form)})
             .then(response => {
                 alert('Data berhasil disimpan!');
+                
+                // Tambahkan nama ke daftar hari ini agar tidak bisa diisi 2x tanpa perlu reload
+                namaSudahTelatHariIni.push(inputNama.value.trim().toLowerCase());
+                
                 form.reset();
-                inputNama.disabled = true;
-                inputNama.placeholder = "Pilih kelas terlebih dahulu...";
-                dataListNama.innerHTML = '';
-                btnSubmit.disabled = false;
-                btnSubmit.textContent = 'Simpan Data';
+                muatDaftarNama(dataSiswaMentah);
+                cekDuplikat();
             })
             .catch(error => {
                 alert('Terjadi kesalahan saat menyimpan!');
-                btnSubmit.disabled = false;
-                btnSubmit.textContent = 'Simpan Data';
+                cekDuplikat();
             });
     });
 </script>
