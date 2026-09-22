@@ -190,21 +190,27 @@
         btnSubmit.disabled = true;
         btnSubmit.textContent = 'Menyimpan...';
 
-        fetch(scriptURL, { method: 'POST', body: new FormData(form)})
-            .then(response => {
-                alert('Data berhasil disimpan!');
-                
-                // Tambahkan nama ke daftar hari ini agar tidak bisa diisi 2x tanpa perlu reload
-                namaSudahTelatHariIni.push(inputNama.value.trim().toLowerCase());
-                
-                form.reset();
-                muatDaftarNama(dataSiswaMentah);
-                cekDuplikat();
-            })
-            .catch(error => {
-                alert('Terjadi kesalahan saat menyimpan!');
-                cekDuplikat();
-            });
+        // Mengubah format FormData ke URLSearchParams agar kompatibel penuh dengan Apps Script
+        const formData = new URLSearchParams(new FormData(form));
+
+        fetch(scriptURL, { 
+            method: 'POST', 
+            body: formData 
+        })
+        .then(response => {
+            alert('Data berhasil disimpan!');
+            
+            namaSudahTelatHariIni.push(inputNama.value.trim().toLowerCase());
+            
+            form.reset();
+            muatDaftarNama(dataSiswaMentah);
+            cekDuplikat();
+        })
+        .catch(error => {
+            alert('Terjadi kesalahan saat menyimpan!');
+            console.error('Detail Error:', error);
+            cekDuplikat();
+        });
     });
 </script>
 </body>
