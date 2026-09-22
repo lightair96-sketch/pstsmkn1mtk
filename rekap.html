@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rekap Keterlambatan Siswa</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        h2 { margin-top: 0; color: #333; text-align: center; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        input, select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: inherit;
+            flex: 1;
+            min-width: 150px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #ff7e5f;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) { background-color: #fdfdfd; }
+        .badge-kelas {
+            background: #e2e8f0;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        #loading { text-align: center; font-weight: 600; color: #666; padding: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Rekap Keterlambatan Siswa</h2>
+    
+    <div class="controls">
+        <input type="text" id="searchNama" placeholder="Cari nama siswa...">
+        <input type="text" id="searchKelas" placeholder="Cari kelas...">
+    </div>
+
+    <div id="loading">Memuat data rekap...</div>
+
+    <table id="tabelRekap" style="display: none;">
+        <thead>
+            <tr>
+                <th>Waktu</th>
+                <th>Nama Siswa</th>
+                <th>Kelas</th>
+                <th>Alasan</th>
+            </tr>
+        </thead>
+        <tbody id="bodyTabel"></tbody>
+    </table>
+</div>
+
+<script>
+    // MASUKKAN URL WEB APP APPS SCRIPT ANDA DI SINI
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbxgbrXXwgJ2nmjxLB-a28geRMfcTXFuGSszZwKbRGrE3Pj0x1XB8NzTiW646TUSC6P_Qw/exec';
+    
+    let semuaDataRekap = [];
+
+    // Ambil data rekap dari Apps Script (?action=rekap)
+    fetch(scriptURL + '?action=rekap')
+        .then(res => res.json())
+        .then(data => {
+            semuaDataRekap = data;
+            tampilkanData(semuaDataRekap);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('tabelRekap').style.display = 'table';
+        })
+        .catch(err => {
+            document.getElementById('loading').textContent = 'Gagal memuat data rekap.';
+            console.error(err);
+        });
+
+    function tampilkanData(data) {
+        const tbody = document.getElementById('bodyTabel');
+        tbody.innerHTML = '';
+        
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Belum ada data keterlambatan.</td></tr>';
+            return;
+        }
+
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-size: 13px; color: #666;">${item.waktu}</td>
+                <td><strong>${item.nama}</strong></td>
+                <td><span class="badge-kelas">${item.kelas}</span></td>
+                <td>${item.alasan}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Fitur pencarian otomatis saat mengetik
+    document.getElementById('searchNama').addEventListener('input', filterData);
+    document.getElementById('searchKelas').addEventListener('input', filterData);
+
+    function filterData() {
+        const kataNama = document.getElementById('searchNama').value.toLowerCase();
+        const kataKelas = document.getElementById('searchKelas').value.toLowerCase();
+
+        const hasilFilter = semuaDataRekap.filter(item => {
+            const cocokNama = item.nama.toLowerCase().includes(kataNama);
+            const cocokKelas = item.kelas.toLowerCase().includes(kataKelas);
+            return cocokNama && cocokKelas;
+        });
+
+        tampilkanData(hasilFilter);
+    }
+</script>
+
+</body>
+</html>
